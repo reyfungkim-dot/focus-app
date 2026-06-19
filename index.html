@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a1f0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Focus App">
+<link rel="manifest" href="manifest.json">
+<title>Focus App</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0a1f0f;
+    color: #e8e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px 60px;
+  }
+
+  h1 {
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #6c6c8a;
+    margin-bottom: 28px;
+  }
+
+  /* ── Main nav tabs ── */
+  .nav-tabs {
+    display: flex;
+    gap: 4px;
+    background: #1e1e2e;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 32px;
+  }
+  .nav-tab {
+    padding: 8px 24px;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    color: #6c6c8a;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .nav-tab.active { background: #7c6af7; color: #fff; }
+
+  /* ── Sections ── */
+  .section { width: 100%; max-width: 460px; display: none; flex-direction: column; align-items: center; }
+  .section.visible { display: flex; }
+
+  /* ── Timer section ── */
+  .modes {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .mode-btn {
+    padding: 5px 16px;
+    border-radius: 20px;
+    border: 1px solid #2a2a3a;
+    background: transparent;
+    color: #6c6c8a;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: all 0.2s;
+  }
+  .mode-btn.active { background: #7c6af7; border-color: #7c6af7; color: #fff; }
+
+  .ring-wrap {
+    position: relative;
+    width: 210px;
+    height: 210px;
+    margin-bottom: 28px;
+  }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: #1e1e2e; stroke-width: 10; }
+  .ring-fill {
+    fill: none; stroke: #7c6af7; stroke-width: 10; stroke-linecap: round;
+    stroke-dasharray: 628; stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.5s linear, stroke 0.3s;
+  }
+  .ring-fill.break { stroke: #3ecf8e; }
+  .time-display {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); text-align: center;
+  }
+  .time-display .digits { font-size: 2.8rem; font-weight: 700; letter-spacing: 0.05em; line-height: 1; }
+  .time-display .label { font-size: 0.72rem; color: #6c6c8a; margin-top: 4px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .controls { display: flex; gap: 12px; margin-bottom: 28px; }
+  .btn { padding: 10px 28px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.92rem; font-weight: 600; transition: all 0.15s; }
+  .btn-primary { background: #7c6af7; color: #fff; }
+  .btn-primary:hover { background: #9580ff; }
+  .btn-secondary { background: #1e1e2e; color: #9090b0; border: 1px solid #2a2a3a; }
+  .btn-secondary:hover { background: #2a2a3a; color: #e8e8f0; }
+
+  .streak { display: flex; gap: 6px; margin-bottom: 28px; min-height: 14px; flex-wrap: wrap; justify-content: center; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #7c6af7; opacity: 0.2; }
+  .dot.done { opacity: 1; }
+
+  /* Voice */
+  .voice-section {
+    width: 100%; padding: 14px 16px;
+    background: #1e1e2e; border: 1px solid #2a2a3a; border-radius: 12px; margin-bottom: 24px;
+  }
+  .voice-label { font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: #6c6c8a; margin-bottom: 10px; }
+  .voice-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .btn-record, .btn-play {
+    padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600; transition: all 0.15s;
+  }
+  .btn-record { background: #c0392b; color: #fff; }
+  .btn-record:hover { background: #e74c3c; }
+  .btn-record.recording { background: #e74c3c; animation: pulse 1s infinite; }
+  .btn-play { background: #2a2a3a; color: #9090b0; border: 1px solid #3a3a5a; }
+  .btn-play:not(:disabled) { color: #3ecf8e; border-color: #3ecf8e; }
+  .btn-play:not(:disabled):hover { background: #1a3a2a; }
+  .btn-play:disabled { opacity: 0.4; cursor: default; }
+  .rec-status { font-size: 0.78rem; color: #6c6c8a; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.6} }
+
+  /* Timer tasks */
+  .task-section { width: 100%; }
+  .section-title {
+    font-size: 0.78rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: #6c6c8a; margin-bottom: 10px;
+  }
+  .task-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .task-input {
+    flex: 1; padding: 9px 13px; background: #1e1e2e; border: 1px solid #2a2a3a;
+    border-radius: 8px; color: #e8e8f0; font-size: 0.88rem; outline: none; transition: border-color 0.2s;
+  }
+  .task-input:focus { border-color: #7c6af7; }
+  .task-input::placeholder { color: #3a3a5a; }
+  .btn-add {
+    padding: 9px 16px; background: #1e1e2e; border: 1px solid #2a2a3a;
+    border-radius: 8px; color: #7c6af7; cursor: pointer; font-size: 1.2rem; line-height: 1; transition: all 0.15s;
+  }
+  .btn-add:hover { background: #2a2a3a; }
+  .task-list { display: flex; flex-direction: column; gap: 7px; }
+  .task-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 13px;
+    background: #1e1e2e; border-radius: 8px; border: 1px solid #2a2a3a; cursor: pointer; transition: all 0.15s;
+  }
+  .task-item.active-task { border-color: #7c6af7; background: #1a1830; }
+  .task-item.done-task { opacity: 0.4; }
+  .task-check {
+    width: 17px; height: 17px; border-radius: 50%; border: 2px solid #3a3a5a;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 0.6rem; transition: all 0.2s;
+  }
+  .task-item.done-task .task-check { background: #3ecf8e; border-color: #3ecf8e; color: #fff; }
+  .task-name { flex: 1; font-size: 0.88rem; }
+  .task-item.done-task .task-name { text-decoration: line-through; }
+  .task-pomos { font-size: 0.72rem; color: #6c6c8a; }
+  .task-del { background: none; border: none; color: #3a3a5a; cursor: pointer; font-size: 0.82rem; padding: 0 2px; transition: color 0.15s; }
+  .task-del:hover { color: #f06292; }
+  .empty-msg { text-align: center; color: #3a3a5a; font-size: 0.85rem; padding: 20px 0; }
+
+  /* ── Agenda section ── */
+  .calendar-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; margin-bottom: 16px;
+  }
+  .cal-title { font-size: 1rem; font-weight: 700; }
+  .cal-nav-btn {
+    background: #1e1e2e; border: 1px solid #2a2a3a; color: #9090b0;
+    border-radius: 8px; padding: 5px 14px; cursor: pointer; font-size: 1rem; transition: all 0.15s;
+  }
+  .cal-nav-btn:hover { background: #2a2a3a; color: #e8e8f0; }
+  .cal-grid {
+    width: 100%; display: grid; grid-template-columns: repeat(7,1fr);
+    gap: 3px; margin-bottom: 20px;
+  }
+  .cal-day-name {
+    text-align: center; font-size: 0.72rem; color: #6c6c8a;
+    padding: 4px 0; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .cal-day {
+    aspect-ratio: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; border-radius: 8px; cursor: pointer;
+    font-size: 0.88rem; position: relative; transition: all 0.15s; border: 1px solid transparent;
+  }
+  .cal-day:hover { background: #1e1e2e; }
+  .cal-day.other-month { color: #3a3a5a; }
+  .cal-day.today { border-color: #7c6af7; color: #7c6af7; font-weight: 700; }
+  .cal-day.selected { background: #7c6af7; color: #fff; }
+  .cal-day.selected.today { background: #7c6af7; border-color: #9580ff; }
+  .cal-dot {
+    width: 4px; height: 4px; border-radius: 50%; background: #3ecf8e;
+    position: absolute; bottom: 4px;
+  }
+  .events-panel { width: 100%; }
+  .events-date-label { font-size: 0.8rem; color: #9090b0; margin-bottom: 10px; }
+  .event-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .event-input {
+    flex: 1; padding: 9px 13px; background: #1e1e2e; border: 1px solid #2a2a3a;
+    border-radius: 8px; color: #e8e8f0; font-size: 0.88rem; outline: none; transition: border-color 0.2s;
+  }
+  .event-input:focus { border-color: #7c6af7; }
+  .event-input::placeholder { color: #3a3a5a; }
+  .event-time {
+    width: 90px; padding: 9px 10px; background: #1e1e2e; border: 1px solid #2a2a3a;
+    border-radius: 8px; color: #e8e8f0; font-size: 0.88rem; outline: none;
+  }
+  .event-list { display: flex; flex-direction: column; gap: 7px; }
+  .event-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 13px;
+    background: #1e1e2e; border-radius: 8px; border-left: 3px solid #7c6af7;
+  }
+  .event-item.todo-event { border-left-color: #3ecf8e; opacity: 1; }
+  .event-item.todo-event.done-event { opacity: 0.45; }
+  .event-item.todo-event.done-event .event-name { text-decoration: line-through; }
+  .event-time-badge { font-size: 0.78rem; color: #7c6af7; font-weight: 700; min-width: 40px; }
+  .event-item.todo-event .event-time-badge { color: #3ecf8e; }
+  .event-name { flex: 1; font-size: 0.88rem; }
+  .event-del { background: none; border: none; color: #3a3a5a; cursor: pointer; font-size: 0.82rem; transition: color 0.15s; }
+  .event-del:hover { color: #f06292; }
+  .todo-prio-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .prio-dot-hoog { background: #f06292; }
+  .prio-dot-middel { background: #f0c040; }
+  .prio-dot-laag { background: #3ecf8e; }
+
+  /* ── Todo section ── */
+  .todo-filters { display: flex; gap: 6px; margin-bottom: 16px; }
+  .filter-btn {
+    padding: 5px 14px; border-radius: 20px; border: 1px solid #2a2a3a;
+    background: transparent; color: #6c6c8a; cursor: pointer; font-size: 0.82rem; transition: all 0.2s;
+  }
+  .filter-btn.active { background: #2a2a3a; color: #e8e8f0; border-color: #4a4a6a; }
+  .todo-add-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-start; }
+  .todo-fields { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .todo-input {
+    padding: 9px 13px; background: #1e1e2e; border: 1px solid #2a2a3a;
+    border-radius: 8px; color: #e8e8f0; font-size: 0.88rem; outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  .todo-input:focus { border-color: #7c6af7; }
+  .todo-input::placeholder { color: #3a3a5a; }
+  .todo-meta-row { display: flex; gap: 6px; }
+  .todo-date, .todo-prio {
+    padding: 6px 10px; background: #1e1e2e; border: 1px solid #2a2a3a;
+    border-radius: 8px; color: #9090b0; font-size: 0.82rem; outline: none; cursor: pointer;
+  }
+  .todo-date { flex: 1; }
+  .todo-list { display: flex; flex-direction: column; gap: 7px; }
+  .todo-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px;
+    background: #1e1e2e; border-radius: 8px; border: 1px solid #2a2a3a; transition: all 0.15s;
+  }
+  .todo-item.done-todo { opacity: 0.45; }
+  .todo-cb {
+    width: 18px; height: 18px; border-radius: 5px; border: 2px solid #3a3a5a;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    cursor: pointer; margin-top: 1px; font-size: 0.65rem; transition: all 0.2s;
+  }
+  .todo-item.done-todo .todo-cb { background: #3ecf8e; border-color: #3ecf8e; color: #fff; }
+  .todo-body { flex: 1; }
+  .todo-text { font-size: 0.88rem; line-height: 1.4; }
+  .todo-item.done-todo .todo-text { text-decoration: line-through; }
+  .todo-tags { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+  .todo-tag {
+    font-size: 0.7rem; padding: 2px 8px; border-radius: 10px;
+    background: #2a2a3a; color: #9090b0;
+  }
+  .todo-tag.prio-hoog { background: #3a1a1a; color: #f06292; }
+  .todo-tag.prio-middel { background: #2a2618; color: #f0c040; }
+  .todo-tag.prio-laag { background: #1a2a1a; color: #3ecf8e; }
+  .todo-del { background: none; border: none; color: #3a3a5a; cursor: pointer; font-size: 0.82rem; transition: color 0.15s; margin-top: 2px; }
+  .todo-del:hover { color: #f06292; }
+
+  /* Banner */
+  .banner {
+    position: fixed; top: 20px; left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: #7c6af7; color: #fff; padding: 11px 22px; border-radius: 10px;
+    font-size: 0.88rem; font-weight: 600;
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 100; white-space: nowrap;
+  }
+  .banner.show { transform: translateX(-50%) translateY(0); }
+  .banner.green { background: #3ecf8e; color: #0f2a1f; }
+</style>
+</head>
+<body>
+
+<h1>Focus App</h1>
+
+<div class="nav-tabs">
+  <button class="nav-tab active" data-tab="timer">⏱ Timer</button>
+  <button class="nav-tab" data-tab="agenda">📅 Agenda</button>
+  <button class="nav-tab" data-tab="todo">✅ Todo</button>
+</div>
+
+<!-- ══════════ TIMER ══════════ -->
+<div class="section visible" id="sec-timer">
+  <div class="modes">
+    <button class="mode-btn active" id="btn-focus">Focus</button>
+    <button class="mode-btn" id="btn-short">Korte pauze</button>
+    <button class="mode-btn" id="btn-long">Lange pauze</button>
+    <button class="mode-btn" id="btn-test" style="border-color:#f0a500;color:#f0a500;">Test 30s</button>
+  </div>
+
+  <div class="ring-wrap">
+    <svg width="210" height="210" viewBox="0 0 210 210">
+      <circle class="ring-bg" cx="105" cy="105" r="95"/>
+      <circle class="ring-fill" id="ring" cx="105" cy="105" r="95"/>
+    </svg>
+    <div class="time-display">
+      <div class="digits" id="digits">25:00</div>
+      <div class="label" id="mode-label">Focus</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="start-btn">Start</button>
+    <button class="btn btn-secondary" id="reset-btn">Reset</button>
+  </div>
+
+  <div class="streak" id="streak"></div>
+
+  <div class="voice-section">
+    <div class="voice-label">🎙️ Jouw schreeuw</div>
+    <div class="voice-controls">
+      <button class="btn-record" id="record-btn">⏺ Opnemen</button>
+      <button class="btn-play" id="play-btn" disabled>▶ Afspelen</button>
+      <span class="rec-status" id="rec-status">Nog geen opname</span>
+    </div>
+  </div>
+
+  <div class="task-section">
+    <div class="section-title">Focus taken</div>
+    <div class="task-input-row">
+      <input class="task-input" id="task-input" placeholder="Waar werk je aan?" maxlength="80">
+      <button class="btn-add" id="add-task-btn">+</button>
+    </div>
+    <div class="task-list" id="task-list"></div>
+  </div>
+</div>
+
+<!-- ══════════ AGENDA ══════════ -->
+<div class="section" id="sec-agenda">
+  <div class="calendar-nav">
+    <button class="cal-nav-btn" id="cal-prev">‹</button>
+    <div class="cal-title" id="cal-title"></div>
+    <button class="cal-nav-btn" id="cal-next">›</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="events-panel">
+    <div class="events-date-label" id="events-date-label"></div>
+    <div class="event-input-row">
+      <input class="event-time" type="time" id="event-time">
+      <input class="event-input" id="event-input" placeholder="Afspraak toevoegen...">
+      <button class="btn-add" id="add-event-btn">+</button>
+    </div>
+    <div class="event-list" id="event-list"></div>
+  </div>
+</div>
+
+<!-- ══════════ TODO ══════════ -->
+<div class="section" id="sec-todo">
+  <div class="todo-filters">
+    <button class="filter-btn active" data-filter="all">Alles</button>
+    <button class="filter-btn" data-filter="open">Open</button>
+    <button class="filter-btn" data-filter="done">Klaar</button>
+  </div>
+  <div class="todo-add-row">
+    <div class="todo-fields">
+      <input class="todo-input" id="todo-input" placeholder="Nieuwe taak..." maxlength="120">
+      <div class="todo-meta-row">
+        <input class="todo-date" type="date" id="todo-date">
+        <select class="todo-prio" id="todo-prio">
+          <option value="">Prioriteit</option>
+          <option value="hoog">🔴 Hoog</option>
+          <option value="middel">🟡 Middel</option>
+          <option value="laag">🟢 Laag</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-add" id="add-todo-btn" style="align-self:stretch;">+</button>
+  </div>
+  <div class="todo-list" id="todo-list"></div>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<script>
+// ══════════════════════════════════════
+//  NAV TABS
+// ══════════════════════════════════════
+document.querySelectorAll('.nav-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+    btn.classList.add('active');
+    document.getElementById('sec-' + btn.dataset.tab).classList.add('visible');
+  });
+});
+
+// ══════════════════════════════════════
+//  TIMER
+// ══════════════════════════════════════
+const MODES = {
+  focus: { label: 'Focus', mins: 25, color: '#7c6af7' },
+  short: { label: 'Korte pauze', mins: 5,  color: '#3ecf8e' },
+  long:  { label: 'Lange pauze', mins: 15, color: '#3ecf8e' },
+  test:  { label: 'Test 30s',    mins: 0.5,color: '#f0a500' },
+};
+const CIRC = 2 * Math.PI * 95;
+
+let mode = 'focus', totalSecs = 1500, remaining = 1500, running = false, timerInterval = null, completedPomos = 0, activeTaskId = null;
+let tasks = JSON.parse(localStorage.getItem('ft_tasks') || '[]');
+
+const ring     = document.getElementById('ring');
+const digits   = document.getElementById('digits');
+const modeLbl  = document.getElementById('mode-label');
+const startBtn = document.getElementById('start-btn');
+const streakEl = document.getElementById('streak');
+const taskList = document.getElementById('task-list');
+
+ring.style.strokeDasharray = CIRC;
+
+function setMode(m) {
+  if (running) return;
+  mode = m;
+  totalSecs = Math.round(MODES[m].mins * 60);
+  remaining = totalSecs;
+  document.querySelectorAll('.mode-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['focus','short','long','test'][i] === m);
+  });
+  ring.style.stroke = MODES[m].color;
+  ring.classList.toggle('break', m !== 'focus');
+  modeLbl.textContent = MODES[m].label;
+  updateDisplay();
+}
+
+function toggleTimer() {
+  if (running) {
+    clearInterval(timerInterval); running = false; startBtn.textContent = 'Verder';
+  } else {
+    running = true; startBtn.textContent = 'Pauze';
+    timerInterval = setInterval(tick, 1000);
+  }
+}
+
+function tick() {
+  remaining--;
+  if (remaining <= 0) {
+    remaining = 0; updateDisplay();
+    clearInterval(timerInterval); running = false; startBtn.textContent = 'Start';
+    onComplete(); return;
+  }
+  updateDisplay();
+}
+
+function updateDisplay() {
+  const m = String(Math.floor(remaining / 60)).padStart(2,'0');
+  const s = String(remaining % 60).padStart(2,'0');
+  digits.textContent = m + ':' + s;
+  ring.style.strokeDashoffset = CIRC * (remaining / totalSecs);
+}
+
+function resetTimer() {
+  clearInterval(timerInterval); running = false; remaining = totalSecs;
+  startBtn.textContent = 'Start'; updateDisplay();
+}
+
+// ── Audio ──
+function playPing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.18, 0.36].forEach(off => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime + off);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + off + 0.15);
+      gain.gain.setValueAtTime(0.5, ctx.currentTime + off);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + off + 0.4);
+      osc.start(ctx.currentTime + off); osc.stop(ctx.currentTime + off + 0.4);
+    });
+  } catch(e) {}
+}
+
+function sayGoGoGo() {
+  try {
+    const u = new SpeechSynthesisUtterance('Go! Go! Go!');
+    u.lang = 'en-US'; u.rate = 1.2; u.pitch = 1.3; u.volume = 1;
+    speechSynthesis.speak(u);
+  } catch(e) {}
+}
+
+// ── Voice recorder ──
+let mediaRecorder = null, recordedUrl = null, isRecording = false;
+const recordBtn = document.getElementById('record-btn');
+const playBtn   = document.getElementById('play-btn');
+const recStatus = document.getElementById('rec-status');
+
+recordBtn.addEventListener('click', async () => {
+  if (isRecording) { mediaRecorder.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const chunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+      recordedUrl = URL.createObjectURL(new Blob(chunks, { type: 'audio/webm' }));
+      playBtn.disabled = false;
+      recStatus.textContent = '✅ Opname opgeslagen!';
+      recordBtn.textContent = '⏺ Opnieuw';
+      recordBtn.classList.remove('recording');
+      isRecording = false;
+    };
+    mediaRecorder.start(); isRecording = true;
+    recordBtn.textContent = '⏹ Stop'; recordBtn.classList.add('recording');
+    recStatus.textContent = '🔴 Aan het opnemen...';
+  } catch(e) { recStatus.textContent = '❌ Microfoon geweigerd'; }
+});
+
+playBtn.addEventListener('click', () => { if (recordedUrl) new Audio(recordedUrl).play(); });
+function playVoice() { if (recordedUrl) new Audio(recordedUrl).play(); }
+
+function onComplete() {
+  if (mode === 'test') {
+    playPing(); playVoice();
+    showBanner('💥 Geluidstest klaar!', false); setMode('focus');
+  } else if (mode === 'focus') {
+    completedPomos++;
+    if (activeTaskId !== null) {
+      const t = tasks.find(t => t.id === activeTaskId);
+      if (t) { t.pomos = (t.pomos||0)+1; saveTasks(); renderTasks(); }
+    }
+    renderStreak(); playPing();
+    showBanner('🎉 Focus klaar! Neem een pauze.', false);
+    if (completedPomos % 4 === 0) setMode('long'); else setMode('short');
+  } else {
+    sayGoGoGo(); showBanner('Pauze voorbij — aan de slag!', true); setMode('focus');
+  }
+}
+
+function renderStreak() {
+  streakEl.innerHTML = '';
+  const total = Math.max(completedPomos, 8);
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < completedPomos ? ' done' : '');
+    streakEl.appendChild(d);
+  }
+}
+
+// ── Timer tasks ──
+function addTask() {
+  const inp = document.getElementById('task-input');
+  const name = inp.value.trim(); if (!name) return;
+  const t = { id: Date.now(), name, done: false, pomos: 0 };
+  tasks.push(t); saveTasks(); renderTasks(); inp.value = '';
+  if (activeTaskId === null) selectTask(t.id);
+}
+function selectTask(id) { activeTaskId = id; renderTasks(); }
+function toggleTaskDone(id) {
+  const t = tasks.find(t => t.id === id);
+  if (t) { t.done = !t.done; saveTasks(); renderTasks(); }
+}
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  if (activeTaskId === id) activeTaskId = null;
+  saveTasks(); renderTasks();
+}
+function renderTasks() {
+  if (!tasks.length) { taskList.innerHTML = '<div class="empty-msg">Voeg een taak toe</div>'; return; }
+  taskList.innerHTML = '';
+  tasks.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'task-item' + (t.id===activeTaskId?' active-task':'') + (t.done?' done-task':'');
+    div.addEventListener('click', () => !t.done && selectTask(t.id));
+
+    const check = document.createElement('div'); check.className = 'task-check';
+    check.textContent = t.done ? '✓' : '';
+    check.addEventListener('click', e => { e.stopPropagation(); toggleTaskDone(t.id); });
+
+    const name = document.createElement('div'); name.className = 'task-name'; name.textContent = t.name;
+    const pomos = document.createElement('div'); pomos.className = 'task-pomos';
+    pomos.textContent = t.pomos > 0 ? '🍅'.repeat(Math.min(t.pomos,8)) : '';
+    const del = document.createElement('button'); del.className = 'task-del'; del.textContent = '✕';
+    del.addEventListener('click', e => { e.stopPropagation(); deleteTask(t.id); });
+
+    div.appendChild(check); div.appendChild(name); div.appendChild(pomos); div.appendChild(del);
+    taskList.appendChild(div);
+  });
+}
+function saveTasks() { localStorage.setItem('ft_tasks', JSON.stringify(tasks)); }
+
+// Wire timer buttons
+document.getElementById('btn-focus').addEventListener('click', () => setMode('focus'));
+document.getElementById('btn-short').addEventListener('click', () => setMode('short'));
+document.getElementById('btn-long').addEventListener('click', () => setMode('long'));
+document.getElementById('btn-test').addEventListener('click', () => setMode('test'));
+document.getElementById('start-btn').addEventListener('click', toggleTimer);
+document.getElementById('reset-btn').addEventListener('click', resetTimer);
+document.getElementById('add-task-btn').addEventListener('click', addTask);
+document.getElementById('task-input').addEventListener('keydown', e => { if(e.key==='Enter') addTask(); });
+
+// ══════════════════════════════════════
+//  AGENDA
+// ══════════════════════════════════════
+let calYear, calMonth, selectedDate;
+let events = JSON.parse(localStorage.getItem('ft_events') || '{}');
+
+function dateKey(y, m, d) { return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+function todayKey() { const n=new Date(); return dateKey(n.getFullYear(),n.getMonth(),n.getDate()); }
+
+function initCal() {
+  const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth();
+  selectedDate = todayKey(); renderCal(); renderEvents();
+}
+
+function renderCal() {
+  const months = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+  document.getElementById('cal-title').textContent = months[calMonth] + ' ' + calYear;
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  ['Ma','Di','Wo','Do','Vr','Za','Zo'].forEach(d => {
+    const el = document.createElement('div'); el.className='cal-day-name'; el.textContent=d; grid.appendChild(el);
+  });
+  const first = new Date(calYear, calMonth, 1);
+  let startDow = first.getDay(); // 0=Sun
+  startDow = startDow === 0 ? 6 : startDow - 1; // shift to Mon=0
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+  const tk = todayKey();
+
+  for (let i = 0; i < startDow; i++) {
+    const day = daysInPrev - startDow + 1 + i;
+    const el = document.createElement('div'); el.className='cal-day other-month'; el.textContent=day; grid.appendChild(el);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = dateKey(calYear, calMonth, d);
+    const el = document.createElement('div'); el.className='cal-day'; el.textContent=d;
+    if (key === tk) el.classList.add('today');
+    if (key === selectedDate) el.classList.add('selected');
+    const hasTodo = todos.some(t => t.date === key);
+    if ((events[key] && events[key].length) || hasTodo) {
+      const dot = document.createElement('div'); dot.className='cal-dot'; el.appendChild(dot);
+    }
+    el.addEventListener('click', () => { selectedDate = key; renderCal(); renderEvents(); });
+    grid.appendChild(el);
+  }
+  let extra = 1;
+  while ((startDow + daysInMonth + extra - 1) % 7 !== 0) {
+    const el = document.createElement('div'); el.className='cal-day other-month'; el.textContent=extra++; grid.appendChild(el);
+  }
+}
+
+function renderEvents() {
+  const parts = selectedDate.split('-');
+  const d = new Date(+parts[0], +parts[1]-1, +parts[2]);
+  const days = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'];
+  document.getElementById('events-date-label').textContent =
+    days[d.getDay()] + ' ' + d.getDate() + ' ' + ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()] + ' ' + d.getFullYear();
+
+  const list = document.getElementById('event-list');
+  list.innerHTML = '';
+  const evs = (events[selectedDate] || []).slice().sort((a,b) => a.time.localeCompare(b.time));
+  const dayTodos = todos.filter(t => t.date === selectedDate);
+
+  if (!evs.length && !dayTodos.length) { list.innerHTML = '<div class="empty-msg">Geen afspraken of taken</div>'; return; }
+
+  evs.forEach((ev, i) => {
+    const div = document.createElement('div'); div.className = 'event-item';
+    const time = document.createElement('div'); time.className='event-time-badge'; time.textContent = ev.time || '—';
+    const name = document.createElement('div'); name.className='event-name'; name.textContent = ev.name;
+    const del = document.createElement('button'); del.className='event-del'; del.textContent='✕';
+    del.addEventListener('click', () => { (events[selectedDate]||[]).splice(i,1); saveEvents(); renderCal(); renderEvents(); });
+    div.appendChild(time); div.appendChild(name); div.appendChild(del);
+    list.appendChild(div);
+  });
+
+  dayTodos.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'event-item todo-event' + (t.done ? ' done-event' : '');
+
+    const badge = document.createElement('div'); badge.className='event-time-badge'; badge.textContent='taak';
+
+    const name = document.createElement('div'); name.className='event-name'; name.textContent = t.text;
+
+    if (t.prio) {
+      const dot = document.createElement('div');
+      dot.className = 'todo-prio-dot prio-dot-' + t.prio;
+      div.appendChild(badge); div.appendChild(name); div.appendChild(dot);
+    } else {
+      div.appendChild(badge); div.appendChild(name);
+    }
+
+    const cb = document.createElement('button'); cb.className='event-del';
+    cb.textContent = t.done ? '↩' : '✓'; cb.title = t.done ? 'Markeer open' : 'Markeer klaar';
+    cb.style.color = t.done ? '#6c6c8a' : '#3ecf8e';
+    cb.addEventListener('click', () => { toggleTodoDone(t.id); renderCal(); renderEvents(); });
+    div.appendChild(cb);
+    list.appendChild(div);
+  });
+}
+
+function addEvent() {
+  const name = document.getElementById('event-input').value.trim();
+  const time = document.getElementById('event-time').value;
+  if (!name) return;
+  if (!events[selectedDate]) events[selectedDate] = [];
+  events[selectedDate].push({ name, time });
+  saveEvents(); renderCal(); renderEvents();
+  document.getElementById('event-input').value = '';
+  document.getElementById('event-time').value = '';
+}
+
+function saveEvents() { localStorage.setItem('ft_events', JSON.stringify(events)); }
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal();
+});
+document.getElementById('cal-next').addEventListener('click', () => {
+  calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal();
+});
+document.getElementById('add-event-btn').addEventListener('click', addEvent);
+document.getElementById('event-input').addEventListener('keydown', e => { if(e.key==='Enter') addEvent(); });
+
+// ══════════════════════════════════════
+//  TODO
+// ══════════════════════════════════════
+let todos = JSON.parse(localStorage.getItem('ft_todos') || '[]');
+let todoFilter = 'all';
+
+function addTodo() {
+  const text = document.getElementById('todo-input').value.trim(); if(!text) return;
+  const date = document.getElementById('todo-date').value;
+  const prio = document.getElementById('todo-prio').value;
+  todos.push({ id: Date.now(), text, date, prio, done: false });
+  saveTodos(); renderTodos();
+  document.getElementById('todo-input').value = '';
+  document.getElementById('todo-date').value = '';
+  document.getElementById('todo-prio').value = '';
+}
+
+function toggleTodoDone(id) {
+  const t = todos.find(t=>t.id===id); if(t){t.done=!t.done; saveTodos(); renderTodos();}
+}
+function deleteTodo(id) { todos=todos.filter(t=>t.id!==id); saveTodos(); renderTodos(); }
+
+function renderTodos() {
+  const list = document.getElementById('todo-list');
+  list.innerHTML = '';
+  const filtered = todos.filter(t => todoFilter==='all' ? true : todoFilter==='done' ? t.done : !t.done);
+  if (!filtered.length) { list.innerHTML='<div class="empty-msg">Geen taken</div>'; return; }
+  const sorted = filtered.slice().sort((a,b) => {
+    const po = {hoog:0,middel:1,laag:2,'':3};
+    return (po[a.prio]||3) - (po[b.prio]||3) || (a.date||'z').localeCompare(b.date||'z');
+  });
+  sorted.forEach(t => {
+    const div = document.createElement('div'); div.className='todo-item'+(t.done?' done-todo':'');
+    const cb = document.createElement('div'); cb.className='todo-cb'; cb.textContent=t.done?'✓':'';
+    cb.addEventListener('click', () => toggleTodoDone(t.id));
+    const body = document.createElement('div'); body.className='todo-body';
+    const txt = document.createElement('div'); txt.className='todo-text'; txt.textContent=t.text;
+    const tags = document.createElement('div'); tags.className='todo-tags';
+    if (t.prio) { const tg=document.createElement('span'); tg.className='todo-tag prio-'+t.prio; tg.textContent=t.prio; tags.appendChild(tg); }
+    if (t.date) {
+      const parts=t.date.split('-'); const dateStr=parts[2]+'-'+parts[1]+'-'+parts[0];
+      const tg=document.createElement('span'); tg.className='todo-tag'; tg.textContent='📅 '+dateStr; tags.appendChild(tg);
+    }
+    body.appendChild(txt); if(tags.children.length) body.appendChild(tags);
+    const del=document.createElement('button'); del.className='todo-del'; del.textContent='✕';
+    del.addEventListener('click', () => deleteTodo(t.id));
+    div.appendChild(cb); div.appendChild(body); div.appendChild(del);
+    list.appendChild(div);
+  });
+}
+function saveTodos() {
+  localStorage.setItem('ft_todos', JSON.stringify(todos));
+  renderCal();
+  renderEvents();
+}
+
+document.getElementById('add-todo-btn').addEventListener('click', addTodo);
+document.getElementById('todo-input').addEventListener('keydown', e => { if(e.key==='Enter') addTodo(); });
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    todoFilter = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTodos();
+  });
+});
+
+// ══════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════
+function showBanner(msg, green) {
+  const b = document.getElementById('banner');
+  b.textContent = msg;
+  b.className = 'banner show' + (green ? ' green' : '');
+  setTimeout(() => b.className = 'banner' + (green?(' green'):''), 3000);
+}
+
+// ══════════════════════════════════════
+//  HERINNERINGEN — 30 min voor afspraak
+// ══════════════════════════════════════
+const notifiedKeys = new Set(); // "datum|naam" zodat we niet dubbel notificeren
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.3, 0.6].forEach(off => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.connect(g); g.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = 660;
+      g.gain.setValueAtTime(0.4, ctx.currentTime + off);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + off + 0.25);
+      osc.start(ctx.currentTime + off); osc.stop(ctx.currentTime + off + 0.25);
+    });
+  } catch(e) {}
+}
+
+async function requestNotifPermission() {
+  if (window.electronAPI) return; // Electron regelt dit zelf
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') await Notification.requestPermission();
+}
+
+function sendNotification(title, body) {
+  if (window.electronAPI) {
+    window.electronAPI.notify(title, body);
+  } else if (Notification.permission === 'granted') {
+    new Notification(title, { body });
+  }
+}
+
+function checkReminders() {
+  const now = new Date();
+  const todayStr = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+  const evs = events[todayStr] || [];
+
+  evs.forEach(ev => {
+    if (!ev.time) return;
+    const [h, m] = ev.time.split(':').map(Number);
+    const evDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+    const diffMin = (evDate - now) / 60000;
+    const key = todayStr + '|' + ev.name + '|' + ev.time;
+
+    if (diffMin > 0 && diffMin <= 30 && !notifiedKeys.has(key)) {
+      notifiedKeys.add(key);
+      playBeep();
+      const minLeft = Math.round(diffMin);
+      sendNotification('📅 Herinnering', `"${ev.name}" begint over ${minLeft} minuten (${ev.time})`);
+      showBanner(`⏰ Over ${minLeft} min: ${ev.name}`, false);
+    }
+  });
+}
+
+requestNotifPermission();
+setInterval(checkReminders, 30000);
+checkReminders();
+
+// Service Worker registreren
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js');
+}
+
+// Init
+updateDisplay(); renderTasks(); renderStreak(); initCal(); renderTodos();
+</script>
+</body>
+</html>
